@@ -548,21 +548,46 @@ function renderGraph() {
     const fromOffset = transition.from === "SRC" ? 31 : 70;
     const toOffset = transition.to === "DST" ? 31 : 70;
 
-    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    line.setAttribute("x1", from.x + fromOffset);
-    line.setAttribute("y1", from.y);
-    line.setAttribute("x2", to.x - toOffset);
-    line.setAttribute("y2", to.y);
-    line.setAttribute("stroke", best ? "#2e8b57" : active ? "#df8a36" : "#b5bdc7");
-    line.setAttribute("stroke-width", best ? "5" : active ? "4" : "2");
-    line.setAttribute("marker-end", best ? "url(#arrowBest)" : active ? "url(#arrowActive)" : "url(#arrow)");
-    elements.graph.appendChild(line);
+    const start = { x: from.x + fromOffset, y: from.y };
+    const end = { x: to.x - toOffset, y: to.y };
+    const edge = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    edge.setAttribute("d", routedEdgePath(start, end));
+    edge.setAttribute("fill", "none");
+    edge.setAttribute("stroke", best ? "#2e8b57" : active ? "#df8a36" : "#b5bdc7");
+    edge.setAttribute("stroke-width", best ? "5" : active ? "4" : "2");
+    edge.setAttribute("stroke-linecap", "round");
+    edge.setAttribute("stroke-linejoin", "round");
+    edge.setAttribute("marker-end", best ? "url(#arrowBest)" : active ? "url(#arrowActive)" : "url(#arrow)");
+    elements.graph.appendChild(edge);
   });
 
   drawVirtualNode(positions.SRC, "SRC", bundle.source, highlight.currentContact === "SRC", "source");
   drawVirtualNode(positions.DST, "DST", bundle.destination, false, "destination");
 
   contacts.forEach(contact => drawContactNode(contact, positions[contact.id]));
+}
+
+function routedEdgePath(start, end) {
+  const horizontalSpan = end.x - start.x;
+
+  // Short transitions between adjacent Contact columns remain straight.
+  if (horizontalSpan <= 260) {
+    return `M ${start.x} ${start.y} L ${end.x} ${end.y}`;
+  }
+
+  // A long transition skips one or more columns. Route it through an outer
+  // lane so that the line cannot pass through an intermediate Contact card.
+  const laneY = start.y <= 260 ? 92 : 428;
+  const bend = Math.min(56, Math.max(34, horizontalSpan / 5));
+  const firstLaneX = start.x + bend;
+  const lastLaneX = end.x - bend;
+
+  return [
+    `M ${start.x} ${start.y}`,
+    `C ${start.x + bend * 0.35} ${start.y}, ${start.x + bend * 0.55} ${laneY}, ${firstLaneX} ${laneY}`,
+    `L ${lastLaneX} ${laneY}`,
+    `C ${end.x - bend * 0.55} ${laneY}, ${end.x - bend * 0.35} ${end.y}, ${end.x} ${end.y}`
+  ].join(" ");
 }
 
 function drawVirtualNode(position, label, physicalNode, active, kind) {
