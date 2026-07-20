@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Interactive Space DTN Contact Graph label-setting algorithm visualizer." />
+  <title>Space DTN Contact Label-setting Visualizer</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="page">
+    <header class="site-header">
+      <p class="eyebrow">SPACE DTN · CONTACT GRAPH · EARLIEST ARRIVAL</p>
+      <h1>Contact Label-setting Algorithm Visualizer</h1>
+      <p class="subtitle">
+        將 Contact 視為 vertex，逐步觀察 Bundle 等待、傳輸、容量檢查、Label extension 與 dominance。
+      </p>
+      <a class="source-link" href="https://bagle102.github.io/spprc-label-setting-visualizer/" target="_blank" rel="noreferrer">
+        查看原始 SPPRC / SPPTW 版本 ↗
+      </a>
+    </header>
+
+    <section class="dashboard" aria-label="Algorithm visualizer">
+      <div class="graph-column">
+        <section class="graph-card">
+          <div class="section-title">
+            <div>
+              <span class="section-kicker">CONTACT GRAPH</span>
+              <h2>Contact topology</h2>
+            </div>
+            <div class="bundle-summary" id="bundleSummary"></div>
+          </div>
+          <svg id="graph" viewBox="0 0 960 520" role="img" aria-label="Contact graph visualization"></svg>
+          <div class="legend">
+            <div><span class="dot current"></span>Current Label</div>
+            <div><span class="dot testing"></span>Contact under test</div>
+            <div><span class="dot feasible"></span>Feasible / best path</div>
+            <div><span class="dot rejected"></span>Infeasible / dominated</div>
+          </div>
+        </section>
+
+        <section class="panel controls-panel">
+          <div class="section-title compact">
+            <div>
+              <span class="section-kicker">EXECUTION</span>
+              <h2>Algorithm controls</h2>
+            </div>
+            <span id="stepCounter" class="step-counter">READY</span>
+          </div>
+          <div class="button-row">
+            <button id="nextButton" class="primary" type="button">Next Step</button>
+            <button id="runButton" type="button">Run All</button>
+            <button id="resetButton" type="button">Reset Algorithm</button>
+          </div>
+        </section>
+
+        <section class="panel concept-panel">
+          <div class="section-title compact">
+            <div>
+              <span class="section-kicker">MODIFIED MODEL</span>
+              <h2>Resource extension and feasibility</h2>
+            </div>
+          </div>
+          <p>
+            每個矩形是一個 scheduled Contact，箭頭表示兩個 Contacts 在拓樸上可接續。
+            搜尋候選路徑時只檢查 residual capacity，不會因為建立候選 Label 就扣除容量。
+          </p>
+          <div class="formula-grid">
+            <code>s<sub>j</sub> = max(arrival(L<sub>i</sub>), start(c<sub>j</sub>))</code>
+            <code>x<sub>j</sub> = BundleSize / rate(c<sub>j</sub>)</code>
+            <code>finish<sub>j</sub> = s<sub>j</sub> + x<sub>j</sub></code>
+            <code>arrival(L<sub>j</sub>) = finish<sub>j</sub> + delay(c<sub>j</sub>)</code>
+          </div>
+        </section>
+      </div>
+
+      <aside class="status-column">
+        <section class="panel explanation-panel">
+          <div class="section-title compact">
+            <div>
+              <span class="section-kicker">CURRENT STEP</span>
+              <h2>Step explanation</h2>
+            </div>
+          </div>
+          <div id="explain" class="explanation">Press Next Step to start.</div>
+        </section>
+
+        <section class="panel labels-panel">
+          <div class="section-title compact">
+            <div>
+              <span class="section-kicker">QUEUE U</span>
+              <h2>Unprocessed Labels</h2>
+            </div>
+            <span class="count-badge" id="uCount">0</span>
+          </div>
+          <div class="scroll-table label-table">
+            <table id="uTable">
+              <thead><tr><th>ID</th><th>Contact</th><th>Arrival</th><th>Path</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel labels-panel">
+          <div class="section-title compact">
+            <div>
+              <span class="section-kicker">SET P</span>
+              <h2>Processed Labels</h2>
+            </div>
+            <span class="count-badge" id="pCount">0</span>
+          </div>
+          <div class="scroll-table label-table">
+            <table id="pTable">
+              <thead><tr><th>ID</th><th>Contact</th><th>Arrival</th><th>Path</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel log-panel">
+          <div class="section-title compact">
+            <div>
+              <span class="section-kicker">TRACE</span>
+              <h2>Algorithm Log</h2>
+            </div>
+          </div>
+          <pre id="log" class="log"></pre>
+        </section>
+      </aside>
+    </section>
+
+    <section class="panel editor-panel">
+      <div class="section-title editor-heading">
+        <div>
+          <span class="section-kicker">EXPERIMENT SETUP</span>
+          <h2>Bundle & Contact editor</h2>
+        </div>
+        <div class="button-row">
+          <button id="defaultButton" type="button">Default Example</button>
+          <button id="applyButton" class="primary" type="button">Apply & Reset</button>
+        </div>
+      </div>
+
+      <div class="bundle-editor">
+        <label>Source<input id="bundleSource" value="S" /></label>
+        <label>Destination<input id="bundleDestination" value="D" /></label>
+        <label>Generation time<input id="bundleGeneration" type="number" min="0" step="0.1" value="0" /></label>
+        <label>Bundle size<input id="bundleSize" type="number" min="0.1" step="0.1" value="10" /></label>
+      </div>
+
+      <div class="editor-actions">
+        <button id="addContactButton" type="button">Add Contact</button>
+        <button id="removeContactButton" type="button">Remove Last Contact</button>
+        <p>
+          Transition 依 sender／receiver 自動建立；時間與容量則在 Label extension 時動態檢查。
+        </p>
+      </div>
+
+      <div id="contactEditor" class="scroll-table contact-table"></div>
+
+      <div class="transition-summary">
+        <strong>Generated topology transitions</strong>
+        <p id="transitionSummary"></p>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
