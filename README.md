@@ -179,23 +179,36 @@ Expected behavior:
 
 ## Two Graph-model Views
 
-The site now presents the same Contact plan in two complementary representations:
+The site presents two graph representations:
 
-1. **Contact-as-vertex Model** — the original CGR-oriented view. Each scheduled Contact is a graph vertex, and transitions connect topology-compatible Contacts.
-2. **Satellite Time-expanded Topology** — each vertex is a satellite state `(satellite, time)`. Scheduled Contacts become transmission edges, while horizontal edges on the same satellite represent store-and-wait intervals.
+1. **Contact-as-vertex Model** — the CGR-oriented algorithm view. Each scheduled Contact is a graph vertex.
+2. **Satellite Node-splitting Topology** — the physical satellite topology is expanded into directed ingress and forwarding vertices.
 
-For the current Bundle, a Contact `c` is visualized at its earliest-use timing as:
+For a physical satellite `v` with degree `d`, the node-splitting view creates:
 
 ```text
-sender(c)@start(c)
-  -> receiver(c)@[start(c) + BundleSize/rate(c) + propagationDelay(c)]
+d ingress vertices: v1, v2, ..., vd
+one forwarding hub: v(d+1)
 ```
 
-This makes asynchronous links explicit. Contacts reaching the same physical satellite at different times terminate at different time-expanded vertices, such as `B@t1` and `B@t2`.
+Each ingress vertex corresponds to arrival from one specific neighboring satellite. Internal edges connect every ingress vertex to the forwarding hub. Each bidirectional physical link `u—v` becomes two directed expanded edges:
+
+```text
+hub(u) -> ingress(v, from u)
+hub(v) -> ingress(u, from v)
+```
+
+The default topology follows the research sketch exactly:
+
+```text
+s—A, s—B, A—B, A—t, B—t
+```
+
+This node-splitting representation is different from a time-expanded graph: the suffixes in `A1, A2, A3, A4` identify expanded topology states, not time instants.
 
 ## Features
 
-- Switchable Contact-vertex and satellite-node time-expanded views
+- Switchable Contact-vertex and satellite-node-splitting views
 - Interactive Contact Graph visualization
 - Editable Bundle parameters
 - Editable Contact plan
