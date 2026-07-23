@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="Interactive Space DTN Contact Graph label-setting algorithm visualizer." />
   <title>Space DTN Contact Label-setting Visualizer</title>
-  <link rel="stylesheet" href="styles.css?v=2" />
+  <link rel="stylesheet" href="styles.css?v=3" />
 </head>
 <body>
   <main class="page">
@@ -24,7 +24,7 @@
           Contact-as-vertex Model
         </button>
         <button class="view-tab" type="button" data-view-target="satelliteModelView" aria-selected="false">
-          Satellite Time-expanded Topology
+          Satellite Node-splitting Topology
         </button>
       </nav>
     </header>
@@ -176,77 +176,91 @@
     </div>
 
     <div id="satelliteModelView" class="model-view" hidden>
-      <section class="panel topology-intro">
+      <section class="panel topology-intro split-intro">
         <div>
           <span class="section-kicker">ALTERNATIVE GRAPH MODEL</span>
-          <h2>Satellite-node Time-expanded Topology</h2>
+          <h2>Satellite-node Topology Expansion</h2>
         </div>
         <p>
-          這個分頁採用老師理解的表示法：每個 vertex 是某顆衛星在某個時間的狀態
-          <b>(satellite, time)</b>。Scheduled Contact 改畫成跨時間的 transmission edge；
-          同一顆衛星沿時間軸前進的灰色 edge，表示儲存並等待下一次 Contact。
+          這個分頁依照手繪版本進行 <b>node splitting</b>：上方每個 vertex 仍代表一顆實體衛星；
+          展開後，每顆衛星依相鄰連線建立多個 ingress vertices，再加上一個 forwarding hub。
+          原本的雙向 link 會變成兩條跨群組的 directed edges。
         </p>
       </section>
 
-      <section class="topology-layout" aria-label="Satellite time-expanded topology">
-        <section class="graph-card time-expanded-card">
-          <div class="section-title">
-            <div>
-              <span class="section-kicker">TIME-EXPANDED GRAPH</span>
-              <h2>拓樸隨時間展開</h2>
+      <section class="split-topology-layout" aria-label="Satellite node-splitting topology">
+        <div class="split-graph-column">
+          <section class="graph-card physical-topology-card">
+            <div class="section-title">
+              <div>
+                <span class="section-kicker">ORIGINAL TOPOLOGY</span>
+                <h2>實體衛星拓樸</h2>
+              </div>
+              <div id="physicalTopologySummary" class="bundle-summary"></div>
             </div>
-            <div id="expandedBundleSummary" class="bundle-summary"></div>
-          </div>
-
-          <div class="timeline-scroll">
-            <svg id="timeExpandedGraph" role="img" aria-label="Satellite-node time-expanded topology"></svg>
-          </div>
-
-          <div class="expanded-legend">
-            <div><span class="edge-key wait"></span>Waiting / store edge</div>
-            <div><span class="edge-key contact"></span>Feasible Contact edge</div>
-            <div><span class="edge-key best"></span>Selected Contact edge</div>
-            <div><span class="edge-key invalid"></span>Time / capacity infeasible</div>
-          </div>
-        </section>
-
-        <aside class="topology-side">
-          <section class="panel">
-            <span class="section-kicker">MODEL MAPPING</span>
-            <h2>兩種表示法的差別</h2>
-            <table class="comparison-table">
-              <thead><tr><th>Element</th><th>Contact Graph</th><th>Expanded Topology</th></tr></thead>
-              <tbody>
-                <tr><td>Vertex</td><td>Scheduled Contact</td><td>Satellite state (v,t)</td></tr>
-                <tr><td>Transmission</td><td>在 vertex 內完成</td><td>跨時間 Contact edge</td></tr>
-                <tr><td>Waiting</td><td>Label arrival 中隱含</td><td>同衛星的水平 edge</td></tr>
-                <tr><td>Path</td><td>C1 → C3 → C4</td><td>S@0 → A@2.2 → A@4 → B@6.2 …</td></tr>
-              </tbody>
-            </table>
+            <svg id="physicalTopologyGraph" viewBox="0 0 960 320" role="img" aria-label="Original physical satellite topology"></svg>
           </section>
 
+          <section class="graph-card node-split-card">
+            <div class="section-title">
+              <div>
+                <span class="section-kicker">NODE-SPLITTING GRAPH</span>
+                <h2>展開後的有向拓樸</h2>
+              </div>
+              <div class="bundle-summary">Ingress → forwarding hub → next satellite ingress</div>
+            </div>
+            <div class="split-graph-scroll">
+              <svg id="nodeSplitGraph" viewBox="0 0 1200 760" role="img" aria-label="Node-splitting expanded satellite topology"></svg>
+            </div>
+            <div class="expanded-legend split-legend">
+              <div><span class="edge-key internal"></span>Internal forwarding edge</div>
+              <div><span class="edge-key cross"></span>Expanded directed link</div>
+              <div><span class="split-node-key ingress"></span>Ingress vertex</div>
+              <div><span class="split-node-key hub"></span>Forwarding hub</div>
+            </div>
+          </section>
+        </div>
+
+        <aside class="topology-side split-side">
           <section class="panel timing-callout">
-            <span class="section-kicker">WHY EXPAND?</span>
-            <h2>時間不同步怎麼解決？</h2>
+            <span class="section-kicker">HOW TO READ</span>
+            <h2>這張展開圖代表什麼？</h2>
             <p>
-              例如 S→B 與 A→B 發生在不同時間，它們不再共同指向一個沒有時間資訊的 B。
-              展開後會分別連到 <b>B@t₁</b>、<b>B@t₂</b>；Bundle 抵達較早的 B 後，
-              透過 waiting edge 留在 B，直到下一個可用 Contact。
+              若實體節點 v 有 d 個鄰居，就建立 d 個 ingress vertices，再建立一個 hub
+              v<sub>d+1</sub>。每個 ingress 只表示「從特定鄰居抵達 v」；
+              Bundle 經由 internal edge 進入 hub 後，才選擇下一條跨衛星 edge。
             </p>
           </section>
 
           <section class="panel">
             <div class="section-title compact">
               <div>
-                <span class="section-kicker">CONTACT → EDGE</span>
-                <h2>目前 Contact 的展開結果</h2>
+                <span class="section-kicker">EXPANSION MAP</span>
+                <h2>各衛星的拆分結果</h2>
               </div>
             </div>
-            <div id="expandedContactTable" class="scroll-table expanded-contact-table"></div>
+            <div id="splitMappingTable" class="scroll-table split-mapping-table"></div>
+          </section>
+
+          <section class="panel topology-editor-panel">
+            <div class="section-title compact">
+              <div>
+                <span class="section-kicker">TOPOLOGY EDITOR</span>
+                <h2>Physical links</h2>
+              </div>
+              <button id="resetTopologyButton" type="button">Default Topology</button>
+            </div>
+
+            <div class="new-link-row">
+              <label>Node 1<input id="newLinkFrom" value="s" aria-label="First link endpoint"></label>
+              <label>Node 2<input id="newLinkTo" value="A" aria-label="Second link endpoint"></label>
+              <button id="addPhysicalLinkButton" class="primary" type="button">Add Bidirectional Link</button>
+            </div>
+
+            <div id="topologyLinkEditor" class="scroll-table topology-link-table"></div>
             <p class="topology-note">
-              圖中 arrival 使用「從 Contact start 立刻傳送」的 earliest-use 時間：
-              start + BundleSize/rate + propagation delay。實際 Label 若較晚抵達 sender，
-              transmission edge 的出發與抵達時間也會跟著向右移。
+              預設拓樸完全依照手繪圖：s–A、s–B、A–B、A–t、B–t。
+              新增或刪除 link 後，上方原圖與下方展開圖會同步重畫。
             </p>
           </section>
         </aside>
@@ -255,6 +269,6 @@
   </main>
 
   <script src="app.js?v=3"></script>
-  <script src="topology.js?v=1"></script>
+  <script src="topology.js?v=2"></script>
 </body>
 </html>
