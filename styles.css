@@ -363,3 +363,98 @@ th { position: sticky; top: 0; z-index: 1; background: #edf0f3; }
   .view-tab { min-width: 0; }
   .topology-intro { grid-template-columns: 1fr; gap: 8px; }
 }
+
+
+/* Node-splitting topology correction */
+.split-intro { border-left-color: var(--orange); }
+.split-topology-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(360px, .75fr);
+  gap: 18px;
+  align-items: start;
+}
+.split-graph-column { min-width: 0; }
+#physicalTopologyGraph {
+  display: block;
+  width: 100%;
+  min-height: 290px;
+  border: 1px solid #e0e4e9;
+  background: white;
+}
+.split-graph-scroll {
+  width: 100%;
+  overflow: auto;
+  border: 1px solid #e0e4e9;
+  background: white;
+}
+#nodeSplitGraph {
+  display: block;
+  width: 100%;
+  min-width: 960px;
+  min-height: 650px;
+  background: white;
+}
+.node-split-card { min-width: 0; }
+.split-legend { margin-top: 11px; }
+.edge-key.internal { border-color: var(--blue); }
+.edge-key.cross { border-color: var(--orange); }
+.split-node-key {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  margin: 0 6px -2px 0;
+  border: 2px solid;
+  border-radius: 50%;
+}
+.split-node-key.ingress { border-color: var(--blue); background: var(--blue-pale); }
+.split-node-key.hub { border-color: var(--orange); background: var(--orange-pale); }
+.split-mapping-table { max-height: 280px; }
+.split-mapping-table table { min-width: 510px; }
+.topology-editor-panel h2 { margin-bottom: 0; }
+.new-link-row {
+  display: grid;
+  grid-template-columns: minmax(80px, 1fr) minmax(80px, 1fr);
+  gap: 8px;
+  align-items: end;
+  margin-bottom: 10px;
+}
+.new-link-row label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+.new-link-row input {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 7px 8px;
+  border: 1px solid #b9c0c8;
+}
+.new-link-row button { grid-column: 1 / -1; }
+.topology-link-table { max-height: 235px; }
+.topology-link-table table { min-width: 300px; }
+.delete-link {
+  padding: 5px 8px;
+  color: #9d3030;
+  border-color: #d29a9a;
+}
+.cluster-label {
+  font-family: Consolas, monospace;
+  letter-spacing: .08em;
+}
+
+@media (max-width: 1180px) {
+  .split-topology-layout { grid-template-columns: 1fr; }
+  .split-side {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 13px;
+  }
+  .split-side .panel { margin-bottom: 0; }
+  .topology-editor-panel { grid-column: 1 / -1; }
+}
+
+@media (max-width: 760px) {
+  .split-side { grid-template-columns: 1fr; }
+  .topology-editor-panel { grid-column: auto; }
+}
