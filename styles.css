@@ -244,3 +244,122 @@ th { position: sticky; top: 0; z-index: 1; background: #edf0f3; }
 @media (prefers-reduced-motion: reduce) {
   * { scroll-behavior: auto !important; }
 }
+
+
+/* Model tabs and satellite-node time-expanded topology */
+.view-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 22px;
+}
+.view-tab {
+  min-width: 220px;
+  border-color: #aeb7c2;
+  color: var(--muted);
+  background: #f7f8fa;
+}
+.view-tab.active {
+  border-color: var(--dark);
+  color: white;
+  background: var(--dark);
+}
+.model-view[hidden] { display: none; }
+
+.topology-intro {
+  display: grid;
+  grid-template-columns: minmax(260px, .72fr) minmax(420px, 1.28fr);
+  gap: 26px;
+  align-items: center;
+  margin-bottom: 16px;
+  border-left: 5px solid var(--blue);
+}
+.topology-intro h2 { margin: 4px 0 0; font-size: 24px; }
+.topology-intro p { margin: 0; color: #3d4854; font-size: 14px; line-height: 1.75; }
+
+.topology-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(360px, .8fr);
+  gap: 18px;
+  align-items: start;
+}
+.time-expanded-card { min-width: 0; }
+.timeline-scroll {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid #e0e4e9;
+  background: white;
+}
+#timeExpandedGraph {
+  display: block;
+  width: 100%;
+  min-width: 920px;
+  min-height: 560px;
+  background: #fff;
+}
+.expanded-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 20px;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.edge-key {
+  display: inline-block;
+  width: 27px;
+  height: 0;
+  margin: 0 6px 3px 0;
+  border-top: 3px solid;
+  vertical-align: middle;
+}
+.edge-key.wait { border-color: #c4cad1; }
+.edge-key.contact { border-color: var(--blue); }
+.edge-key.best { border-color: var(--green); border-top-width: 5px; }
+.edge-key.invalid { border-color: var(--red); border-top-style: dashed; }
+
+.topology-side h2 { margin: 4px 0 10px; font-size: 19px; }
+.comparison-table { font-size: 11px; }
+.comparison-table th,
+.comparison-table td { padding: 7px 6px; }
+.timing-callout {
+  border-left: 4px solid var(--orange);
+  background: var(--orange-pale);
+}
+.timing-callout p,
+.topology-note {
+  margin: 0;
+  color: #47525e;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.expanded-contact-table { max-height: 310px; }
+.expanded-contact-table table { min-width: 520px; }
+.contact-status {
+  display: inline-block;
+  padding: 3px 6px;
+  font-family: Consolas, monospace;
+  font-size: 10px;
+  font-weight: 700;
+}
+.contact-status.ok { color: #206c42; background: var(--green-pale); }
+.contact-status.bad { color: #a43d3d; background: var(--red-pale); }
+.topology-note { margin-top: 10px; }
+
+@media (max-width: 1180px) {
+  .topology-layout { grid-template-columns: 1fr; }
+  .topology-side {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 13px;
+  }
+  .topology-side .panel { margin-bottom: 0; }
+}
+
+@media (max-width: 760px) {
+  .view-tabs,
+  .topology-side { display: grid; grid-template-columns: 1fr; }
+  .view-tab { min-width: 0; }
+  .topology-intro { grid-template-columns: 1fr; gap: 8px; }
+}
