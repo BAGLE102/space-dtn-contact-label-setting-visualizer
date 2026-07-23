@@ -90,7 +90,22 @@ function getNeighbors(node) {
     if (link.from === node && !result.includes(link.to)) result.push(link.to);
     if (link.to === node && !result.includes(link.from)) result.push(link.from);
   });
-  return sortNodes(result);
+
+  // Preserve the ingress numbering shown in the reference sketch:
+  // s1←A, s2←B; A1←s, A2←B, A3←t;
+  // B1←t, B2←A, B3←s; t1←A, t2←B.
+  const sketchOrder = {
+    s: ["a", "b"],
+    a: ["s", "b", "t"],
+    b: ["t", "a", "s"],
+    t: ["a", "b"]
+  };
+  const byLower = Object.fromEntries(result.map(neighbor => [neighbor.toLowerCase(), neighbor]));
+  const preferred = (sketchOrder[node.toLowerCase()] || [])
+    .filter(name => byLower[name])
+    .map(name => byLower[name]);
+  const remaining = sortNodes(result).filter(neighbor => !preferred.includes(neighbor));
+  return [...preferred, ...remaining];
 }
 
 function buildModel() {
