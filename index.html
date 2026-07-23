@@ -18,8 +18,18 @@
       <a class="source-link" href="https://bagle102.github.io/spprc-label-setting-visualizer/" target="_blank" rel="noreferrer">
         查看原始 SPPRC / SPPTW 版本 ↗
       </a>
+
+      <nav class="view-tabs" aria-label="Graph model views">
+        <button class="view-tab active" type="button" data-view-target="contactModelView" aria-selected="true">
+          Contact-as-vertex Model
+        </button>
+        <button class="view-tab" type="button" data-view-target="satelliteModelView" aria-selected="false">
+          Satellite Time-expanded Topology
+        </button>
+      </nav>
     </header>
 
+    <div id="contactModelView" class="model-view active">
     <section class="dashboard" aria-label="Algorithm visualizer">
       <div class="graph-column">
         <section class="graph-card">
@@ -163,8 +173,88 @@
         <p id="transitionSummary"></p>
       </div>
     </section>
+    </div>
+
+    <div id="satelliteModelView" class="model-view" hidden>
+      <section class="panel topology-intro">
+        <div>
+          <span class="section-kicker">ALTERNATIVE GRAPH MODEL</span>
+          <h2>Satellite-node Time-expanded Topology</h2>
+        </div>
+        <p>
+          這個分頁採用老師理解的表示法：每個 vertex 是某顆衛星在某個時間的狀態
+          <b>(satellite, time)</b>。Scheduled Contact 改畫成跨時間的 transmission edge；
+          同一顆衛星沿時間軸前進的灰色 edge，表示儲存並等待下一次 Contact。
+        </p>
+      </section>
+
+      <section class="topology-layout" aria-label="Satellite time-expanded topology">
+        <section class="graph-card time-expanded-card">
+          <div class="section-title">
+            <div>
+              <span class="section-kicker">TIME-EXPANDED GRAPH</span>
+              <h2>拓樸隨時間展開</h2>
+            </div>
+            <div id="expandedBundleSummary" class="bundle-summary"></div>
+          </div>
+
+          <div class="timeline-scroll">
+            <svg id="timeExpandedGraph" role="img" aria-label="Satellite-node time-expanded topology"></svg>
+          </div>
+
+          <div class="expanded-legend">
+            <div><span class="edge-key wait"></span>Waiting / store edge</div>
+            <div><span class="edge-key contact"></span>Feasible Contact edge</div>
+            <div><span class="edge-key best"></span>Selected Contact edge</div>
+            <div><span class="edge-key invalid"></span>Time / capacity infeasible</div>
+          </div>
+        </section>
+
+        <aside class="topology-side">
+          <section class="panel">
+            <span class="section-kicker">MODEL MAPPING</span>
+            <h2>兩種表示法的差別</h2>
+            <table class="comparison-table">
+              <thead><tr><th>Element</th><th>Contact Graph</th><th>Expanded Topology</th></tr></thead>
+              <tbody>
+                <tr><td>Vertex</td><td>Scheduled Contact</td><td>Satellite state (v,t)</td></tr>
+                <tr><td>Transmission</td><td>在 vertex 內完成</td><td>跨時間 Contact edge</td></tr>
+                <tr><td>Waiting</td><td>Label arrival 中隱含</td><td>同衛星的水平 edge</td></tr>
+                <tr><td>Path</td><td>C1 → C3 → C4</td><td>S@0 → A@2.2 → A@4 → B@6.2 …</td></tr>
+              </tbody>
+            </table>
+          </section>
+
+          <section class="panel timing-callout">
+            <span class="section-kicker">WHY EXPAND?</span>
+            <h2>時間不同步怎麼解決？</h2>
+            <p>
+              例如 S→B 與 A→B 發生在不同時間，它們不再共同指向一個沒有時間資訊的 B。
+              展開後會分別連到 <b>B@t₁</b>、<b>B@t₂</b>；Bundle 抵達較早的 B 後，
+              透過 waiting edge 留在 B，直到下一個可用 Contact。
+            </p>
+          </section>
+
+          <section class="panel">
+            <div class="section-title compact">
+              <div>
+                <span class="section-kicker">CONTACT → EDGE</span>
+                <h2>目前 Contact 的展開結果</h2>
+              </div>
+            </div>
+            <div id="expandedContactTable" class="scroll-table expanded-contact-table"></div>
+            <p class="topology-note">
+              圖中 arrival 使用「從 Contact start 立刻傳送」的 earliest-use 時間：
+              start + BundleSize/rate + propagation delay。實際 Label 若較晚抵達 sender，
+              transmission edge 的出發與抵達時間也會跟著向右移。
+            </p>
+          </section>
+        </aside>
+      </section>
+    </div>
   </main>
 
-  <script src="app.js?v=2"></script>
+  <script src="app.js?v=3"></script>
+  <script src="topology.js?v=1"></script>
 </body>
 </html>
