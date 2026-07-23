@@ -441,7 +441,19 @@ function render() {
   renderGraph();
   renderTables();
   renderHeaderState();
+  window.dispatchEvent(new CustomEvent("visualizer-state-change"));
 }
+
+window.getContactVisualizerState = function getContactVisualizerState() {
+  return {
+    contacts: contacts.map(contact => ({ ...contact })),
+    bundle: { ...bundle },
+    highlight: {
+      ...highlight,
+      bestPath: highlight.bestPath ? [...highlight.bestPath] : []
+    }
+  };
+};
 
 function renderHeaderState() {
   elements.uCount.textContent = U.length;
