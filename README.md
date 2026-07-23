@@ -177,8 +177,25 @@ Expected behavior:
 - `C2` is rejected because its time window and residual capacity are insufficient.
 - `C1 → C3 → C4` is selected as the earliest feasible Contact sequence.
 
+## Two Graph-model Views
+
+The site now presents the same Contact plan in two complementary representations:
+
+1. **Contact-as-vertex Model** — the original CGR-oriented view. Each scheduled Contact is a graph vertex, and transitions connect topology-compatible Contacts.
+2. **Satellite Time-expanded Topology** — each vertex is a satellite state `(satellite, time)`. Scheduled Contacts become transmission edges, while horizontal edges on the same satellite represent store-and-wait intervals.
+
+For the current Bundle, a Contact `c` is visualized at its earliest-use timing as:
+
+```text
+sender(c)@start(c)
+  -> receiver(c)@[start(c) + BundleSize/rate(c) + propagationDelay(c)]
+```
+
+This makes asynchronous links explicit. Contacts reaching the same physical satellite at different times terminate at different time-expanded vertices, such as `B@t1` and `B@t2`.
+
 ## Features
 
+- Switchable Contact-vertex and satellite-node time-expanded views
 - Interactive Contact Graph visualization
 - Editable Bundle parameters
 - Editable Contact plan
