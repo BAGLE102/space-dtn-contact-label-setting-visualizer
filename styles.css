@@ -390,7 +390,7 @@ th { position: sticky; top: 0; z-index: 1; background: #edf0f3; }
 #nodeSplitGraph {
   display: block;
   width: 100%;
-  min-width: 960px;
+  min-width: 760px;
   min-height: 650px;
   background: white;
 }
