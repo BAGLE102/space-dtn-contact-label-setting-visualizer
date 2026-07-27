@@ -182,9 +182,9 @@
           <h2>Satellite-node Topology Expansion</h2>
         </div>
         <p>
-          這個分頁依照手繪版本進行 <b>node splitting</b>：上方每個 vertex 仍代表一顆實體衛星；
-          展開後，每顆衛星依相鄰連線建立多個 ingress vertices，再加上一個 forwarding hub。
-          原本的雙向 link 會變成兩條跨群組的 directed edges。
+          這個分頁直接同步左側的 Contact plan：上方將每筆 Contact 投影成衛星之間的有向邊；
+          下方則為接收衛星的每筆 incoming Contact 建立一個 ingress vertex，再連到該衛星的 forwarding hub。
+          Contact 保持原本方向；只有左側另有反向 Contact 時，才會出現反向邊。
         </p>
       </section>
 
@@ -193,8 +193,8 @@
           <section class="graph-card physical-topology-card">
             <div class="section-title">
               <div>
-                <span class="section-kicker">ORIGINAL TOPOLOGY</span>
-                <h2>實體衛星拓樸</h2>
+                <span class="section-kicker">SYNCED SATELLITE TOPOLOGY</span>
+                <h2>Contact 對應的衛星拓樸</h2>
               </div>
               <div id="physicalTopologySummary" class="bundle-summary"></div>
             </div>
@@ -207,15 +207,15 @@
                 <span class="section-kicker">NODE-SPLITTING GRAPH</span>
                 <h2>展開後的有向拓樸</h2>
               </div>
-              <div class="bundle-summary">Ingress → forwarding hub → next satellite ingress</div>
+              <div class="bundle-summary">incoming Contact → ingress → forwarding hub → next Contact</div>
             </div>
             <div class="split-graph-scroll">
               <svg id="nodeSplitGraph" viewBox="0 0 1200 760" role="img" aria-label="Node-splitting expanded satellite topology"></svg>
             </div>
             <div class="expanded-legend split-legend">
               <div><span class="edge-key internal"></span>Internal forwarding edge</div>
-              <div><span class="edge-key cross"></span>Expanded directed link</div>
-              <div><span class="split-node-key ingress"></span>Ingress vertex</div>
+              <div><span class="edge-key cross"></span>Directed Contact edge</div>
+              <div><span class="split-node-key ingress"></span>Contact ingress vertex</div>
               <div><span class="split-node-key hub"></span>Forwarding hub</div>
             </div>
           </section>
@@ -226,9 +226,9 @@
             <span class="section-kicker">HOW TO READ</span>
             <h2>這張展開圖代表什麼？</h2>
             <p>
-              若實體節點 v 有 d 個鄰居，就建立 d 個 ingress vertices，再建立一個 hub
-              v<sub>d+1</sub>。每個 ingress 只表示「從特定鄰居抵達 v」；
-              Bundle 經由 internal edge 進入 hub 後，才選擇下一條跨衛星 edge。
+              對每筆 Contact c: u→v，在接收衛星 v 建立一個專屬 ingress vertex；
+              展開邊為 hub(u)→ingress(v,c)，再以 internal edge 連到 hub(v)。
+              因此同一對衛星的不同時段 Contact 仍會保留為不同狀態。
             </p>
           </section>
 
@@ -245,22 +245,16 @@
           <section class="panel topology-editor-panel">
             <div class="section-title compact">
               <div>
-                <span class="section-kicker">TOPOLOGY EDITOR</span>
-                <h2>Physical links</h2>
+                <span class="section-kicker">SYNCED CONTACT PLAN</span>
+                <h2>左側 Contact 對應</h2>
               </div>
-              <button id="resetTopologyButton" type="button">Default Topology</button>
+              <span class="step-counter">AUTO SYNC</span>
             </div>
 
-            <div class="new-link-row">
-              <label>Node 1<input id="newLinkFrom" value="s" aria-label="First link endpoint"></label>
-              <label>Node 2<input id="newLinkTo" value="A" aria-label="Second link endpoint"></label>
-              <button id="addPhysicalLinkButton" class="primary" type="button">Add Bidirectional Link</button>
-            </div>
-
-            <div id="topologyLinkEditor" class="scroll-table topology-link-table"></div>
+            <div id="satelliteContactSummary" class="scroll-table topology-link-table"></div>
             <p class="topology-note">
-              預設拓樸完全依照手繪圖：s–A、s–B、A–B、A–t、B–t。
-              新增或刪除 link 後，上方原圖與下方展開圖會同步重畫。
+              在左側修改 Bundle 或 Contact 後按下 <b>Apply &amp; Reset</b>，本分頁會自動重建衛星拓樸與 node-splitting graph。
+              這裡不再維護另一份獨立的 Physical Link 資料。
             </p>
           </section>
         </aside>
@@ -269,6 +263,6 @@
   </main>
 
   <script src="app.js?v=3"></script>
-  <script src="topology.js?v=3"></script>
+  <script src="topology.js?v=4"></script>
 </body>
 </html>
