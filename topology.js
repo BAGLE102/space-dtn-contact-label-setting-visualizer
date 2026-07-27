@@ -1,167 +1,151 @@
 "use strict";
 
-let physicalLinks = [];
+const SVG_NS = "http://www.w3.org/2000/svg";
 
-const ui = {
+const topologyUI = {
   tabs: [...document.querySelectorAll("[data-view-target]")],
   views: [...document.querySelectorAll(".model-view")],
   physicalGraph: document.getElementById("physicalTopologyGraph"),
   splitGraph: document.getElementById("nodeSplitGraph"),
   summary: document.getElementById("physicalTopologySummary"),
   mappingTable: document.getElementById("splitMappingTable"),
-  linkEditor: document.getElementById("topologyLinkEditor"),
-  fromInput: document.getElementById("newLinkFrom"),
-  toInput: document.getElementById("newLinkTo"),
-  addButton: document.getElementById("addPhysicalLinkButton"),
-  resetButton: document.getElementById("resetTopologyButton")
+  contactSummary: document.getElementById("satelliteContactSummary")
 };
 
-ui.tabs.forEach(tab => tab.addEventListener("click", () => activateView(tab.dataset.viewTarget)));
-ui.addButton.addEventListener("click", addLink);
-ui.resetButton.addEventListener("click", resetDefaultTopology);
+let contactState = {
+  contacts: [],
+  bundle: { source: "S", destination: "D" },
+  highlight: { bestPath: [] }
+};
+
+topologyUI.tabs.forEach(tab => {
+  tab.addEventListener("click", () => activateView(tab.dataset.viewTarget));
+});
+
+window.addEventListener("visualizer-state-change", syncFromContactModel);
 
 function activateView(targetId) {
-  ui.tabs.forEach(tab => {
+  topologyUI.tabs.forEach(tab => {
     const selected = tab.dataset.viewTarget === targetId;
     tab.classList.toggle("active", selected);
     tab.setAttribute("aria-selected", String(selected));
   });
-  ui.views.forEach(view => {
+  topologyUI.views.forEach(view => {
     const selected = view.id === targetId;
     view.hidden = !selected;
     view.classList.toggle("active", selected);
   });
-  if (targetId === "satelliteModelView") renderAll();
+  if (targetId === "satelliteModelView") syncFromContactModel();
 }
 
-function resetDefaultTopology() {
-  physicalLinks = [
-    { from: "s", to: "A" },
-    { from: "s", to: "B" },
-    { from: "A", to: "B" },
-    { from: "A", to: "t" },
-    { from: "B", to: "t" }
-  ];
+function syncFromContactModel() {
+  if (typeof window.getContactVisualizerState !== "function") return;
+  const state = window.getContactVisualizerState();
+  contactState = {
+    contacts: Array.isArray(state.contacts) ? state.contacts.map(contact => ({ ...contact })) : [],
+    bundle: { source: "S", destination: "D", ...(state.bundle || {}) },
+    highlight: {
+      ...(state.highlight || {}),
+      bestPath: [...(state.highlight?.bestPath || [])]
+    }
+  };
   renderAll();
-}
-
-function addLink() {
-  const from = cleanName(ui.fromInput.value);
-  const to = cleanName(ui.toInput.value);
-  if (!from || !to || from === to) return;
-  const exists = physicalLinks.some(link =>
-    (link.from === from && link.to === to) || (link.from === to && link.to === from)
-  );
-  if (exists) return;
-  physicalLinks.push({ from, to });
-  ui.fromInput.value = from;
-  ui.toInput.value = to;
-  renderAll();
-}
-
-function removeLink(index) {
-  if (physicalLinks.length <= 1) return;
-  physicalLinks.splice(index, 1);
-  renderAll();
-}
-
-function cleanName(value) {
-  return String(value || "").trim().replace(/[^A-Za-z0-9_-]/g, "");
-}
-
-function sortNodes(nodes) {
-  return [...nodes].sort((a, b) => {
-    const al = a.toLowerCase(), bl = b.toLowerCase();
-    if (al === "s") return -1;
-    if (bl === "s") return 1;
-    if (al === "t") return 1;
-    if (bl === "t") return -1;
-    return a.localeCompare(b);
-  });
 }
 
 function getNodes() {
-  return sortNodes([...new Set(physicalLinks.flatMap(link => [link.from, link.to]))]);
+  const names = [
+    contactState.bundle.source,
+    contactState.bundle.destination,
+    ...contactState.contacts.flatMap(contact => [contact.sender, contact.receiver])
+  ].filter(Boolean);
+  return sortNodes([...new Set(names)]);
 }
 
-function getNeighbors(node) {
-  const result = [];
-  physicalLinks.forEach(link => {
-    if (link.from === node && !result.includes(link.to)) result.push(link.to);
-    if (link.to === node && !result.includes(link.from)) result.push(link.from);
+function sortNodes(nodes) {
+  const source = contactState.bundle.source;
+  const destination = contactState.bundle.destination;
+  return [...nodes].sort((a, b) => {
+    if (a === source) return -1;
+    if (b === source) return 1;
+    if (a === destination) return 1;
+    if (b === destination) return -1;
+    return a.localeCompare(b, undefined, { numeric: true });
   });
-
-  // Preserve the ingress numbering shown in the reference sketch:
-  // s1←A, s2←B; A1←s, A2←B, A3←t;
-  // B1←t, B2←A, B3←s; t1←A, t2←B.
-  const sketchOrder = {
-    s: ["a", "b"],
-    a: ["s", "b", "t"],
-    b: ["t", "a", "s"],
-    t: ["a", "b"]
-  };
-  const byLower = Object.fromEntries(result.map(neighbor => [neighbor.toLowerCase(), neighbor]));
-  const preferred = (sketchOrder[node.toLowerCase()] || [])
-    .filter(name => byLower[name])
-    .map(name => byLower[name]);
-  const remaining = sortNodes(result).filter(neighbor => !preferred.includes(neighbor));
-  return [...preferred, ...remaining];
 }
 
 function buildModel() {
   const model = {};
   getNodes().forEach(node => {
-    const neighbors = getNeighbors(node);
+    const incoming = contactState.contacts
+      .map((contact, contactIndex) => ({ contact, contactIndex }))
+      .filter(item => item.contact.receiver === node);
     model[node] = {
       node,
-      neighbors,
-      ingress: neighbors.map((neighbor, index) => ({ neighbor, id: `${node}${index + 1}` })),
-      hub: `${node}${neighbors.length + 1}`
+      incoming: incoming.map((item, index) => ({
+        contact: item.contact,
+        contactIndex: item.contactIndex,
+        id: `${node}${index + 1}`
+      })),
+      hub: `${node}${incoming.length + 1}`
     };
   });
   return model;
 }
 
 function renderAll() {
-  renderEditor();
+  if (!topologyUI.physicalGraph || !topologyUI.splitGraph) return;
+  const nodes = getNodes();
+  topologyUI.summary.textContent =
+    `${nodes.length} satellites · ${contactState.contacts.length} directed Contacts · synced`;
+  renderContactSummary();
   renderMapping();
   renderPhysicalGraph();
   renderSplitGraph();
-  ui.summary.textContent = `${getNodes().length} satellites · ${physicalLinks.length} bidirectional links`;
 }
 
-function renderEditor() {
-  ui.linkEditor.innerHTML = `
+function renderContactSummary() {
+  const model = buildModel();
+  const ingressByContact = {};
+  Object.values(model).forEach(item => {
+    item.incoming.forEach(port => {
+      ingressByContact[port.contactIndex] = port.id;
+    });
+  });
+
+  topologyUI.contactSummary.innerHTML = `
     <table>
-      <thead><tr><th>#</th><th>Physical link</th><th>Expanded directions</th><th>Action</th></tr></thead>
+      <thead>
+        <tr><th>Contact</th><th>Satellite link</th><th>Window</th><th>Expanded destination</th></tr>
+      </thead>
       <tbody>
-        ${physicalLinks.map((link, index) => `
+        ${contactState.contacts.map((contact, index) => `
           <tr>
-            <td>${index + 1}</td>
-            <td><b>${esc(link.from)} — ${esc(link.to)}</b></td>
-            <td>${esc(link.from)} → ${esc(link.to)}<br>${esc(link.to)} → ${esc(link.from)}</td>
-            <td><button class="delete-link" type="button" data-delete-link="${index}">Delete</button></td>
+            <td><b>${esc(contact.id)}</b></td>
+            <td>${esc(contact.sender)} → ${esc(contact.receiver)}</td>
+            <td>[${fmt(contact.start)}, ${fmt(contact.end)}]</td>
+            <td>${esc(model[contact.sender]?.hub || "—")} → <b>${esc(ingressByContact[index] || "—")}</b></td>
           </tr>
-        `).join("")}
+        `).join("") || `<tr><td colspan="4">目前沒有 Contact。</td></tr>`}
       </tbody>
     </table>
   `;
-  ui.linkEditor.querySelectorAll("[data-delete-link]").forEach(button => {
-    button.addEventListener("click", () => removeLink(Number(button.dataset.deleteLink)));
-  });
 }
 
 function renderMapping() {
   const model = buildModel();
-  ui.mappingTable.innerHTML = `
+  topologyUI.mappingTable.innerHTML = `
     <table>
-      <thead><tr><th>Satellite</th><th>Neighbors</th><th>Ingress vertices</th><th>Hub</th></tr></thead>
+      <thead>
+        <tr><th>Satellite</th><th>Incoming Contacts</th><th>Ingress vertices</th><th>Forwarding hub</th></tr>
+      </thead>
       <tbody>
         ${Object.values(model).map(item => `
           <tr>
             <td><b>${esc(item.node)}</b></td>
-            <td>${item.neighbors.map(esc).join(", ")}</td>
-            <td>${item.ingress.map(port => `${esc(port.id)} <small>(from ${esc(port.neighbor)})</small>`).join("<br>")}</td>
+            <td>${item.incoming.map(port => esc(port.contact.id)).join(", ") || "—"}</td>
+            <td>${item.incoming.map(port =>
+              `${esc(port.id)} <small>(${esc(port.contact.id)}: ${esc(port.contact.sender)}→${esc(port.contact.receiver)})</small>`
+            ).join("<br>") || "—"}</td>
             <td><b>${esc(item.hub)}</b></td>
           </tr>
         `).join("")}
@@ -170,191 +154,247 @@ function renderMapping() {
   `;
 }
 
-function isSketchTopology(nodes) {
-  const names = nodes.map(node => node.toLowerCase());
-  return nodes.length === 4 && ["s", "a", "b", "t"].every(name => names.includes(name));
-}
-
-function nodeByLower(nodes) {
-  return Object.fromEntries(nodes.map(node => [node.toLowerCase(), node]));
-}
-
 function physicalPositions(nodes, width, height) {
-  if (isSketchTopology(nodes)) {
-    const n = nodeByLower(nodes);
-    return {
-      [n.s]: { x: 105, y: height / 2 },
-      [n.a]: { x: width * .43, y: 72 },
-      [n.b]: { x: width * .43, y: height - 72 },
-      [n.t]: { x: width - 105, y: height / 2 }
-    };
-  }
   const positions = {};
-  nodes.forEach((node, index) => {
-    const angle = Math.PI + 2 * Math.PI * index / Math.max(1, nodes.length);
-    positions[node] = {
-      x: width / 2 + width * .36 * Math.cos(angle),
-      y: height / 2 + height * .32 * Math.sin(angle)
-    };
+  const source = contactState.bundle.source;
+  const destination = contactState.bundle.destination;
+  const middle = nodes.filter(node => node !== source && node !== destination);
+
+  if (source) positions[source] = { x: 86, y: height / 2 };
+  if (destination && destination !== source) positions[destination] = { x: width - 86, y: height / 2 };
+
+  if (middle.length === 1) {
+    positions[middle[0]] = { x: width / 2, y: height / 2 };
+  } else {
+    middle.forEach((node, index) => {
+      const angle = -Math.PI / 2 + (2 * Math.PI * index / Math.max(1, middle.length));
+      positions[node] = {
+        x: width / 2 + width * .22 * Math.cos(angle),
+        y: height / 2 + height * .32 * Math.sin(angle)
+      };
+    });
+  }
+
+  nodes.filter(node => !positions[node]).forEach((node, index) => {
+    positions[node] = { x: width / 2, y: 70 + index * 70 };
   });
   return positions;
 }
 
 function renderPhysicalGraph() {
-  const svg = ui.physicalGraph, width = 960, height = 320;
-  const nodes = getNodes(), positions = physicalPositions(nodes, width, height);
+  const svg = topologyUI.physicalGraph;
+  const width = 960;
+  const height = 320;
+  const nodes = getNodes();
+  const positions = physicalPositions(nodes, width, height);
+  const grouped = groupContacts();
+  const best = new Set(contactState.highlight.bestPath || []);
+
   svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
-  svg.innerHTML = "";
+  svg.innerHTML = markerDefinitions("physical");
 
-  physicalLinks.forEach(link => {
-    const a = positions[link.from], b = positions[link.to];
-    line(svg, a.x, a.y, b.x, b.y, "#4d5966", 3);
-    text(svg, (a.x + b.x) / 2, (a.y + b.y) / 2 - 9, `${link.from}–${link.to}`, 11, "#68737f", "middle", "bold");
+  contactState.contacts.forEach((contact, index) => {
+    const from = positions[contact.sender];
+    const to = positions[contact.receiver];
+    if (!from || !to) return;
+    const group = grouped.get(`${contact.sender}\u0000${contact.receiver}`) || [index];
+    const groupIndex = group.indexOf(index);
+    const offset = (groupIndex - (group.length - 1) / 2) * 28;
+    drawContactEdge(svg, from, to, {
+      offset,
+      stroke: best.has(contact.id) ? "#2e8b57" : "#df8a36",
+      width: best.has(contact.id) ? 5 : 2.5,
+      marker: best.has(contact.id) ? "physical-best" : "physical-contact",
+      label: `${contact.id} [${fmt(contact.start)},${fmt(contact.end)}]`,
+      nodeRadius: 34
+    });
   });
+
   nodes.forEach(node => {
-    const p = positions[node];
-    circle(svg, p.x, p.y, 31, "#fff", "#17202a", 3);
-    text(svg, p.x, p.y + 7, node, 22, "#17202a", "middle", "bold");
+    const position = positions[node];
+    const kind = node === contactState.bundle.source ? "source" :
+      node === contactState.bundle.destination ? "destination" : "normal";
+    const fill = kind === "source" ? "#348f95" : kind === "destination" ? "#2e8b57" : "#dcecf7";
+    const textColor = kind === "normal" ? "#17202a" : "white";
+    appendSvg(svg, "circle", {
+      cx: position.x, cy: position.y, r: 34,
+      fill, stroke: "#2176ae", "stroke-width": 3
+    });
+    addSvgText(svg, position.x, position.y + 6, node, 18, textColor, "middle", "bold");
   });
-}
-
-function clusterPositions(nodes) {
-  if (isSketchTopology(nodes)) {
-    const n = nodeByLower(nodes);
-    return {
-      [n.s]: { x: 145, y: 380 },
-      [n.a]: { x: 520, y: 205 },
-      [n.b]: { x: 520, y: 555 },
-      [n.t]: { x: 990, y: 380 }
-    };
-  }
-  return physicalPositions(nodes, 1080, 640);
 }
 
 function renderSplitGraph() {
-  const svg = ui.splitGraph, width = 1200, height = 760;
-  const model = buildModel(), nodes = Object.keys(model);
-  const centers = clusterPositions(nodes), positions = {};
+  const svg = topologyUI.splitGraph;
+  const model = buildModel();
+  const nodes = getNodes();
+  const width = 1200;
+  const height = Math.max(720, Math.ceil(Math.max(1, nodes.length - 2) / 4) * 180 + 520);
+  const centers = physicalPositions(nodes, width, height);
+  const ports = {};
+  const hubs = {};
+  const best = new Set(contactState.highlight.bestPath || []);
+  const grouped = groupContacts();
+
   svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
-  svg.innerHTML = `
+  svg.innerHTML = markerDefinitions("split");
+
+  Object.values(model).forEach(item => {
+    const center = centers[item.node];
+    const count = item.incoming.length;
+    const clusterHeight = Math.max(126, count * 52 + 38);
+    appendSvg(svg, "rect", {
+      x: center.x - 105, y: center.y - clusterHeight / 2,
+      width: 210, height: clusterHeight, rx: 18,
+      fill: "#f8fafc", stroke: "#b8c1cb", "stroke-width": 2,
+      "stroke-dasharray": "7 5"
+    });
+    addSvgText(svg, center.x, center.y - clusterHeight / 2 + 21,
+      `SATELLITE ${item.node}`, 12, "#52606d", "middle", "bold", "cluster-label");
+
+    hubs[item.node] = { x: center.x + 55, y: center.y + 10, id: item.hub };
+    item.incoming.forEach((port, index) => {
+      const y = center.y + 10 + (index - (count - 1) / 2) * 47;
+      ports[port.contactIndex] = { x: center.x - 55, y, id: port.id };
+    });
+  });
+
+  Object.values(model).forEach(item => {
+    item.incoming.forEach(port => {
+      const start = ports[port.contactIndex];
+      const end = hubs[item.node];
+      drawStraightArrow(svg, start, end, "#2176ae", 2.4, "split-internal");
+    });
+  });
+
+  contactState.contacts.forEach((contact, index) => {
+    const from = hubs[contact.sender];
+    const to = ports[index];
+    if (!from || !to) return;
+    const group = grouped.get(`${contact.sender}\u0000${contact.receiver}`) || [index];
+    const groupIndex = group.indexOf(index);
+    const offset = (groupIndex - (group.length - 1) / 2) * 34;
+    drawContactEdge(svg, from, to, {
+      offset,
+      stroke: best.has(contact.id) ? "#2e8b57" : "#df8a36",
+      width: best.has(contact.id) ? 5 : 2.7,
+      marker: best.has(contact.id) ? "split-best" : "split-contact",
+      label: `${contact.id} ${contact.sender}→${contact.receiver} [${fmt(contact.start)},${fmt(contact.end)}]`,
+      nodeRadius: 20
+    });
+  });
+
+  Object.values(model).forEach(item => {
+    item.incoming.forEach(port => {
+      const position = ports[port.contactIndex];
+      appendSvg(svg, "circle", {
+        cx: position.x, cy: position.y, r: 20,
+        fill: "#e8f2f8", stroke: "#2176ae", "stroke-width": 2.5
+      });
+      addSvgText(svg, position.x, position.y + 5, port.id, 12, "#17202a", "middle", "bold");
+      addSvgText(svg, position.x - 27, position.y + 4, port.contact.id, 10, "#68737f", "end", "bold");
+    });
+
+    const hub = hubs[item.node];
+    appendSvg(svg, "circle", {
+      cx: hub.x, cy: hub.y, r: 24,
+      fill: "#f8dbb8", stroke: "#df8a36", "stroke-width": 3
+    });
+    addSvgText(svg, hub.x, hub.y + 5, hub.id, 13, "#17202a", "middle", "bold");
+  });
+}
+
+function groupContacts() {
+  const grouped = new Map();
+  contactState.contacts.forEach((contact, index) => {
+    const key = `${contact.sender}\u0000${contact.receiver}`;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(index);
+  });
+  return grouped;
+}
+
+function drawContactEdge(svg, from, to, options) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const distance = Math.hypot(dx, dy) || 1;
+  const ux = dx / distance;
+  const uy = dy / distance;
+  const nx = -uy;
+  const ny = ux;
+  const radius = options.nodeRadius || 0;
+  const start = { x: from.x + ux * radius, y: from.y + uy * radius };
+  const end = { x: to.x - ux * radius, y: to.y - uy * radius };
+  const control = {
+    x: (start.x + end.x) / 2 + nx * options.offset,
+    y: (start.y + end.y) / 2 + ny * options.offset
+  };
+  const path = appendSvg(svg, "path", {
+    d: `M ${start.x} ${start.y} Q ${control.x} ${control.y} ${end.x} ${end.y}`,
+    fill: "none", stroke: options.stroke, "stroke-width": options.width,
+    "stroke-linecap": "round", "marker-end": `url(#${options.marker})`
+  });
+  path.setAttribute("aria-label", options.label);
+
+  const labelX = (start.x + 2 * control.x + end.x) / 4 + nx * 12;
+  const labelY = (start.y + 2 * control.y + end.y) / 4 + ny * 12;
+  addSvgText(svg, labelX, labelY, options.label, 10.5, options.stroke, "middle", "bold");
+}
+
+function drawStraightArrow(svg, from, to, stroke, width, marker) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const distance = Math.hypot(dx, dy) || 1;
+  const ux = dx / distance;
+  const uy = dy / distance;
+  appendSvg(svg, "line", {
+    x1: from.x + ux * 20, y1: from.y + uy * 20,
+    x2: to.x - ux * 24, y2: to.y - uy * 24,
+    stroke, "stroke-width": width, "marker-end": `url(#${marker})`
+  });
+}
+
+function markerDefinitions(prefix) {
+  return `
     <defs>
-      <marker id="internalArrow" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#2166c2"></path></marker>
-      <marker id="crossArrow" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#df8a36"></path></marker>
+      <marker id="${prefix}-contact" markerWidth="10" markerHeight="10" refX="9" refY="3"
+        orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#df8a36"></path></marker>
+      <marker id="${prefix}-best" markerWidth="10" markerHeight="10" refX="9" refY="3"
+        orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#2e8b57"></path></marker>
+      <marker id="${prefix}-internal" markerWidth="10" markerHeight="10" refX="9" refY="3"
+        orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#2176ae"></path></marker>
     </defs>
   `;
+}
 
-  nodes.forEach(node => {
-    const item = model[node], center = centers[node], gap = 58;
-    const span = Math.max(1, item.ingress.length - 1) * gap;
-    const boxHeight = Math.max(128, span + 76);
-    roundedRect(svg, center.x - 112, center.y - boxHeight / 2, 224, boxHeight, 18, "#fbfcfd", "#cbd2da", 2, "7 5");
-    text(svg, center.x, center.y - boxHeight / 2 + 22, `SATELLITE ${node}`, 11, "#68737f", "middle", "bold", "cluster-label");
-    item.ingress.forEach((port, index) => {
-      positions[port.id] = { x: center.x - 48, y: center.y + (index - (item.ingress.length - 1) / 2) * gap };
-    });
-    positions[item.hub] = { x: center.x + 62, y: center.y };
+function appendSvg(svg, tag, attributes) {
+  const element = document.createElementNS(SVG_NS, tag);
+  Object.entries(attributes).forEach(([name, value]) => element.setAttribute(name, String(value)));
+  svg.appendChild(element);
+  return element;
+}
+
+function addSvgText(svg, x, y, value, size, fill, anchor = "start", weight = "normal", className = "") {
+  const element = appendSvg(svg, "text", {
+    x, y, fill, "font-size": size, "text-anchor": anchor,
+    "font-family": "Times New Roman, Microsoft JhengHei", "font-weight": weight
   });
-
-  nodes.forEach(node => {
-    const item = model[node], hub = positions[item.hub];
-    item.ingress.forEach(port => {
-      const p = positions[port.id];
-      arrow(svg, `M ${p.x + 21} ${p.y} C ${p.x + 52} ${p.y}, ${hub.x - 43} ${hub.y}, ${hub.x - 24} ${hub.y}`, "#2166c2", 3, "url(#internalArrow)");
-    });
-  });
-
-  physicalLinks.forEach((link, index) => {
-    crossEdge(svg, model, positions, link.from, link.to, index, false);
-    crossEdge(svg, model, positions, link.to, link.from, index, true);
-  });
-
-  nodes.forEach(node => {
-    const item = model[node];
-    item.ingress.forEach(port => {
-      const p = positions[port.id];
-      circle(svg, p.x, p.y, 22, "#e9f1fc", "#2166c2", 3);
-      text(svg, p.x, p.y + 5, port.id, 13, "#17202a", "middle", "bold");
-      text(svg, p.x - 28, p.y + 4, `←${port.neighbor}`, 9, "#68737f", "end", "bold");
-    });
-    const hub = positions[item.hub];
-    circle(svg, hub.x, hub.y, 25, "#fff0df", "#df8a36", 4);
-    text(svg, hub.x, hub.y + 5, item.hub, 14, "#17202a", "middle", "bold");
-    text(svg, hub.x, hub.y + 43, "hub", 10, "#a55e1d", "middle", "bold");
-  });
+  if (className) element.setAttribute("class", className);
+  element.textContent = value;
 }
 
-function crossEdge(svg, model, positions, fromNode, toNode, linkIndex, reverse) {
-  const hubId = model[fromNode].hub;
-  const ingress = model[toNode].ingress.find(port => port.neighbor === fromNode);
-  if (!ingress) return;
-  const a = positions[hubId], b = positions[ingress.id];
-  const startX = a.x + (b.x >= a.x ? 25 : -25);
-  const endX = b.x + (b.x >= a.x ? -22 : 22);
-  let d;
-
-  if (b.x > a.x + 80) {
-    const bend = Math.max(70, (b.x - a.x) * .34);
-    d = `M ${startX} ${a.y} C ${startX + bend} ${a.y}, ${endX - bend} ${b.y}, ${endX} ${b.y}`;
-  } else if (b.x < a.x - 80) {
-    const laneY = reverse ? Math.min(a.y, b.y) - 110 - (linkIndex % 2) * 24 : Math.max(a.y, b.y) + 110 + (linkIndex % 2) * 24;
-    d = `M ${startX} ${a.y} C ${startX + 90} ${laneY}, ${endX - 90} ${laneY}, ${endX} ${b.y}`;
-  } else {
-    const laneX = a.x + (reverse ? 118 : -118);
-    d = `M ${startX} ${a.y} C ${laneX} ${a.y}, ${laneX} ${b.y}, ${endX} ${b.y}`;
-  }
-
-  arrow(svg, d, "#df8a36", 3, "url(#crossArrow)");
-  edgeLabel(svg, (a.x + b.x) / 2, (a.y + b.y) / 2 + (reverse ? 18 : -12), `${fromNode}→${toNode}`);
-}
-
-function arrow(svg, d, stroke, width, marker) {
-  const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
-  p.setAttribute("d", d); p.setAttribute("fill", "none"); p.setAttribute("stroke", stroke);
-  p.setAttribute("stroke-width", width); p.setAttribute("stroke-linecap", "round");
-  p.setAttribute("stroke-linejoin", "round"); p.setAttribute("marker-end", marker);
-  svg.appendChild(p);
-}
-
-function edgeLabel(svg, x, y, label) {
-  const width = Math.max(48, label.length * 7);
-  roundedRect(svg, x - width / 2, y - 12, width, 20, 4, "#fff", "#e1b98f", 1);
-  text(svg, x, y + 2, label, 10, "#a55e1d", "middle", "bold");
-}
-
-function roundedRect(svg, x, y, width, height, radius, fill, stroke, strokeWidth, dash = "") {
-  const r = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-  r.setAttribute("x", x); r.setAttribute("y", y); r.setAttribute("width", width); r.setAttribute("height", height);
-  r.setAttribute("rx", radius); r.setAttribute("fill", fill); r.setAttribute("stroke", stroke);
-  r.setAttribute("stroke-width", strokeWidth); if (dash) r.setAttribute("stroke-dasharray", dash);
-  svg.appendChild(r);
-}
-
-function line(svg, x1, y1, x2, y2, stroke, width) {
-  const l = document.createElementNS("http://www.w3.org/2000/svg", "line");
-  l.setAttribute("x1", x1); l.setAttribute("y1", y1); l.setAttribute("x2", x2); l.setAttribute("y2", y2);
-  l.setAttribute("stroke", stroke); l.setAttribute("stroke-width", width); l.setAttribute("stroke-linecap", "round");
-  svg.appendChild(l);
-}
-
-function circle(svg, cx, cy, radius, fill, stroke, width) {
-  const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-  c.setAttribute("cx", cx); c.setAttribute("cy", cy); c.setAttribute("r", radius);
-  c.setAttribute("fill", fill); c.setAttribute("stroke", stroke); c.setAttribute("stroke-width", width);
-  svg.appendChild(c);
-}
-
-function text(svg, x, y, value, size, fill, anchor = "start", weight = "normal", className = "") {
-  const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
-  t.setAttribute("x", x); t.setAttribute("y", y); t.setAttribute("font-size", size);
-  t.setAttribute("font-family", "Times New Roman, Microsoft JhengHei"); t.setAttribute("font-weight", weight);
-  t.setAttribute("fill", fill); t.setAttribute("text-anchor", anchor);
-  if (className) t.setAttribute("class", className);
-  t.textContent = value; svg.appendChild(t);
+function fmt(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? String(Number(number.toFixed(2))) : "—";
 }
 
 function esc(value) {
-  return String(value).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;").replaceAll("'", "&#039;");
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
-resetDefaultTopology();
+syncFromContactModel();
