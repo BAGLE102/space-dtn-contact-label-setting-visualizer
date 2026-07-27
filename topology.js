@@ -1,5 +1,7 @@
 "use strict";
 
+(() => {
+
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 const topologyUI = {
@@ -220,7 +222,7 @@ function renderPhysicalGraph() {
       cx: position.x, cy: position.y, r: 34,
       fill, stroke: "#2176ae", "stroke-width": 3
     });
-    addSvgText(svg, position.x, position.y + 6, node, 18, textColor, "middle", "bold");
+    addTopologySvgText(svg, position.x, position.y + 6, node, 18, textColor, "middle", "bold");
   });
 }
 
@@ -249,7 +251,7 @@ function renderSplitGraph() {
       fill: "#f8fafc", stroke: "#b8c1cb", "stroke-width": 2,
       "stroke-dasharray": "7 5"
     });
-    addSvgText(svg, center.x, center.y - clusterHeight / 2 + 21,
+    addTopologySvgText(svg, center.x, center.y - clusterHeight / 2 + 21,
       `SATELLITE ${item.node}`, 12, "#52606d", "middle", "bold", "cluster-label");
 
     hubs[item.node] = { x: center.x + 55, y: center.y + 10, id: item.hub };
@@ -291,8 +293,8 @@ function renderSplitGraph() {
         cx: position.x, cy: position.y, r: 20,
         fill: "#e8f2f8", stroke: "#2176ae", "stroke-width": 2.5
       });
-      addSvgText(svg, position.x, position.y + 5, port.id, 12, "#17202a", "middle", "bold");
-      addSvgText(svg, position.x - 27, position.y + 4, port.contact.id, 10, "#68737f", "end", "bold");
+      addTopologySvgText(svg, position.x, position.y + 5, port.id, 12, "#17202a", "middle", "bold");
+      addTopologySvgText(svg, position.x - 27, position.y + 4, port.contact.id, 10, "#68737f", "end", "bold");
     });
 
     const hub = hubs[item.node];
@@ -300,7 +302,7 @@ function renderSplitGraph() {
       cx: hub.x, cy: hub.y, r: 24,
       fill: "#f8dbb8", stroke: "#df8a36", "stroke-width": 3
     });
-    addSvgText(svg, hub.x, hub.y + 5, hub.id, 13, "#17202a", "middle", "bold");
+    addTopologySvgText(svg, hub.x, hub.y + 5, hub.id, 13, "#17202a", "middle", "bold");
   });
 }
 
@@ -338,7 +340,7 @@ function drawContactEdge(svg, from, to, options) {
 
   const labelX = (start.x + 2 * control.x + end.x) / 4 + nx * 12;
   const labelY = (start.y + 2 * control.y + end.y) / 4 + ny * 12;
-  addSvgText(svg, labelX, labelY, options.label, 10.5, options.stroke, "middle", "bold");
+  addTopologySvgText(svg, labelX, labelY, options.label, 10.5, options.stroke, "middle", "bold");
 }
 
 function drawStraightArrow(svg, from, to, stroke, width, marker) {
@@ -374,7 +376,7 @@ function appendSvg(svg, tag, attributes) {
   return element;
 }
 
-function addSvgText(svg, x, y, value, size, fill, anchor = "start", weight = "normal", className = "") {
+function addTopologySvgText(svg, x, y, value, size, fill, anchor = "start", weight = "normal", className = "") {
   const element = appendSvg(svg, "text", {
     x, y, fill, "font-size": size, "text-anchor": anchor,
     "font-family": "Times New Roman, Microsoft JhengHei", "font-weight": weight
@@ -398,3 +400,4 @@ function esc(value) {
 }
 
 syncFromContactModel();
+})();
