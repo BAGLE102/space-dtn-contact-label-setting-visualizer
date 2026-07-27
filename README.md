@@ -179,36 +179,34 @@ Expected behavior:
 
 ## Two Graph-model Views
 
-The site presents two graph representations:
+The site presents two synchronized graph representations:
 
 1. **Contact-as-vertex Model** — the CGR-oriented algorithm view. Each scheduled Contact is a graph vertex.
-2. **Satellite Node-splitting Topology** — the physical satellite topology is expanded into directed ingress and forwarding vertices.
+2. **Satellite Node-splitting Topology** — a satellite-oriented projection generated automatically from the current Contact plan.
 
-For a physical satellite `v` with degree `d`, the node-splitting view creates:
+The left Contact editor is the single data source for both views. After a Contact or Bundle endpoint is changed and **Apply & Reset** is pressed, the satellite topology and its node-splitting graph are rebuilt automatically.
 
-```text
-d ingress vertices: v1, v2, ..., vd
-one forwarding hub: v(d+1)
-```
-
-Each ingress vertex corresponds to arrival from one specific neighboring satellite. Internal edges connect every ingress vertex to the forwarding hub. Each bidirectional physical link `u—v` becomes two directed expanded edges:
+Each Contact remains unidirectional. For a Contact `c: u → v`, the satellite view draws the physical directed edge `u → v` and creates one Contact-specific ingress vertex at the receiver `v`:
 
 ```text
-hub(u) -> ingress(v, from u)
-hub(v) -> ingress(u, from v)
+hub(u) -> ingress(v, c)
+ingress(v, c) -> hub(v)
 ```
 
-The default topology follows the research sketch exactly:
+Parallel Contacts between the same two satellites remain distinct because they may have different availability windows or resources. A reverse edge is shown only when the Contact plan contains a reverse Contact.
+
+For a satellite `v` with `k` incoming Contacts, the expansion creates:
 
 ```text
-s—A, s—B, A—B, A—t, B—t
+k Contact ingress vertices: v1, v2, ..., vk
+one forwarding hub: v(k+1)
 ```
 
-This node-splitting representation is different from a time-expanded graph: the suffixes in `A1, A2, A3, A4` identify expanded topology states, not time instants.
+The suffixes in `A1, A2, ...` identify expanded Contact/topology states, not time instants. This node-splitting representation is therefore different from a time-expanded graph.
 
 ## Features
 
-- Switchable Contact-vertex and satellite-node-splitting views
+- Switchable, synchronized Contact-vertex and satellite-node-splitting views
 - Interactive Contact Graph visualization
 - Editable Bundle parameters
 - Editable Contact plan
@@ -256,6 +254,7 @@ http://localhost:8000
 ├── index.html   # Page structure
 ├── styles.css   # Responsive layout and visual styles
 ├── app.js       # Contact Graph model and Label-setting execution
+├── topology.js  # Contact-to-satellite projection and node splitting
 └── README.md    # Model, algorithm, and usage documentation
 ```
 
