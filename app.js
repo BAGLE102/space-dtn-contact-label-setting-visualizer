@@ -23,6 +23,7 @@ const elements = {
   pCount: document.getElementById("pCount"),
   stepCounter: document.getElementById("stepCounter"),
   bundleSummary: document.getElementById("bundleSummary"),
+  graphStats: document.getElementById("contactGraphStats"),
   transitionSummary: document.getElementById("transitionSummary"),
   contactEditor: document.getElementById("contactEditor"),
   nextButton: document.getElementById("nextButton"),
@@ -460,8 +461,15 @@ function renderHeaderState() {
   elements.pCount.textContent = P.length;
   elements.stepCounter.textContent = finished ? "DONE" : stepNumber === 0 ? "READY" : `STEP ${stepNumber}`;
   elements.bundleSummary.textContent = `Bundle ${bundle.source}→${bundle.destination} · g=${formatNumber(bundle.generationTime)} · B=${formatNumber(bundle.size)}`;
+  renderGraphStats();
   elements.nextButton.disabled = finished;
   elements.runButton.disabled = finished;
+}
+
+function renderGraphStats() {
+  if (!elements.graphStats) return;
+  elements.graphStats.textContent =
+    `節點 ${contacts.length + 2} · 連線 ${buildTransitions().length}`;
 }
 
 function renderTables() {
@@ -514,26 +522,110 @@ function graphLayout() {
     groups.get(contactDepth).push(contact);
   });
 
+  const depthKeys = [...groups.keys()].sort((a, b) => a - b);
+  const fallbackOrder = (left, right) =>
+    left.receiver.localeCompare(right.receiver, undefined, { numeric: true }) ||
+    left.sender.localeCompare(right.sender, undefined, { numeric: true }) ||
+    left.start - right.start ||
+    left.id.localeCompare(right.id, undefined, { numeric: true });
+
+  // First group contacts by the satellite they can forward to. Then perform
+  // barycentric sweeps in both directions so Contacts that connect to each
+  // other remain close together. This reduces crossings without discarding
+  // any topology-compatible transition.
+  groups.forEach(group => group.sort(fallbackOrder));
+  for (let pass = 0; pass < 4; pass += 1) {
+    depthKeys.slice(1).forEach(depthKey => {
+      const previous = groups.get(depthKey - 1) || [];
+      const previousOrder = new Map(previous.map((contact, index) => [contact.id, index]));
+      groups.get(depthKey).sort((left, right) => {
+        const average = contact => {
+          const neighbours = previous.filter(item => item.receiver === contact.sender);
+          if (!neighbours.length) return Number.POSITIVE_INFINITY;
+          return neighbours.reduce((sum, item) => sum + previousOrder.get(item.id), 0) / neighbours.length;
+        };
+        const delta = average(left) - average(right);
+        return Number.isFinite(delta) && delta !== 0 ? delta : fallbackOrder(left, right);
+      });
+    });
+
+    depthKeys.slice(0, -1).reverse().forEach(depthKey => {
+      const next = groups.get(depthKey + 1) || [];
+      const nextOrder = new Map(next.map((contact, index) => [contact.id, index]));
+      groups.get(depthKey).sort((left, right) => {
+        const average = contact => {
+          const neighbours = next.filter(item => contact.receiver === item.sender);
+          if (!neighbours.length) return Number.POSITIVE_INFINITY;
+          return neighbours.reduce((sum, item) => sum + nextOrder.get(item.id), 0) / neighbours.length;
+        };
+        const delta = average(left) - average(right);
+        return Number.isFinite(delta) && delta !== 0 ? delta : fallbackOrder(left, right);
+      });
+    });
+  }
+
+  const largestGroup = Math.max(1, ...[...groups.values()].map(group => group.length));
+  const graphHeight = Math.max(520, largestGroup * 104 + 110);
   const positions = {
-    SRC: { x: 58, y: 260 },
-    DST: { x: 902, y: 260 }
+    SRC: { x: 58, y: graphHeight / 2 },
+    DST: { x: 902, y: graphHeight / 2 }
   };
 
   groups.forEach((group, groupDepth) => {
-    group.sort((a, b) => a.start - b.start || a.id.localeCompare(b.id));
+    const groupSpan = (group.length - 1) * 104;
     group.forEach((contact, index) => {
       positions[contact.id] = {
         x: 58 + (844 * groupDepth / maxDepth),
-        y: 66 + (388 * (index + 1) / (group.length + 1))
+        y: graphHeight / 2 - groupSpan / 2 + index * 104
       };
     });
   });
 
-  return positions;
+  return { positions, height: graphHeight };
+}
+
+function assignTransitionPorts(transitions, positions) {
+  const outgoing = new Map();
+  const incoming = new Map();
+  const add = (map, key, transition) => {
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(transition);
+  };
+
+  transitions.forEach(transition => {
+    add(outgoing, transition.from, transition);
+    add(incoming, transition.to, transition);
+  });
+
+  const portOffset = (index, count) =>
+    Math.max(-32, Math.min(32, (index - (count - 1) / 2) * 8));
+
+  outgoing.forEach(group => {
+    group.sort((left, right) =>
+      (positions[left.to]?.y ?? 0) - (positions[right.to]?.y ?? 0) ||
+      left.to.localeCompare(right.to)
+    );
+    group.forEach((transition, index) => {
+      transition.fromPort = portOffset(index, group.length);
+    });
+  });
+
+  incoming.forEach(group => {
+    group.sort((left, right) =>
+      (positions[left.from]?.y ?? 0) - (positions[right.from]?.y ?? 0) ||
+      left.from.localeCompare(right.from)
+    );
+    group.forEach((transition, index) => {
+      transition.toPort = portOffset(index, group.length);
+    });
+  });
 }
 
 function renderGraph() {
-  const positions = graphLayout();
+  const layout = graphLayout();
+  const { positions, height } = layout;
+  elements.graph.setAttribute("viewBox", `0 0 960 ${height}`);
+  elements.graph.style.minHeight = `${height}px`;
   elements.graph.innerHTML = `
     <defs>
       <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#a8b1bc"></path></marker>
@@ -550,7 +642,10 @@ function renderGraph() {
     }
   }
 
-  buildTransitions().forEach(transition => {
+  const transitions = buildTransitions();
+  assignTransitionPorts(transitions, positions);
+
+  transitions.forEach(transition => {
     const from = positions[transition.from];
     const to = positions[transition.to];
     if (!from || !to) return;
@@ -559,11 +654,10 @@ function renderGraph() {
     const best = bestEdges.has(`${transition.from}->${transition.to}`);
     const fromOffset = transition.from === "SRC" ? 31 : 70;
     const toOffset = transition.to === "DST" ? 31 : 70;
-
-    const start = { x: from.x + fromOffset, y: from.y };
-    const end = { x: to.x - toOffset, y: to.y };
+    const start = { x: from.x + fromOffset, y: from.y + (transition.fromPort || 0) };
+    const end = { x: to.x - toOffset, y: to.y + (transition.toPort || 0) };
     const edge = document.createElementNS("http://www.w3.org/2000/svg", "path");
-    edge.setAttribute("d", routedEdgePath(start, end));
+    edge.setAttribute("d", routedEdgePath(start, end, height));
     edge.setAttribute("fill", "none");
     edge.setAttribute("stroke", best ? "#2e8b57" : active ? "#df8a36" : "#b5bdc7");
     edge.setAttribute("stroke-width", best ? "5" : active ? "4" : "2");
@@ -579,18 +673,21 @@ function renderGraph() {
   contacts.forEach(contact => drawContactNode(contact, positions[contact.id]));
 }
 
-function routedEdgePath(start, end) {
+function routedEdgePath(start, end, graphHeight) {
   const horizontalSpan = end.x - start.x;
+  const direction = horizontalSpan >= 0 ? 1 : -1;
+  const span = Math.abs(horizontalSpan);
 
-  // Short transitions between adjacent Contact columns remain straight.
-  if (horizontalSpan <= 260) {
-    return `M ${start.x} ${start.y} L ${end.x} ${end.y}`;
+  // Curves plus distinct entry/exit ports keep nearby transitions readable.
+  if (span <= 260 || direction < 0) {
+    const bend = Math.max(34, Math.min(78, span * 0.42));
+    return `M ${start.x} ${start.y} C ${start.x + direction * bend} ${start.y}, ${end.x - direction * bend} ${end.y}, ${end.x} ${end.y}`;
   }
 
-  // A long transition skips one or more columns. Route it through an outer
-  // lane so that the line cannot pass through an intermediate Contact card.
-  const laneY = start.y <= 260 ? 92 : 428;
-  const bend = Math.min(56, Math.max(34, horizontalSpan / 5));
+  // Long transitions skip one or more Contact columns. Keep them outside the
+  // Contact-card band instead of routing through intermediate cards.
+  const laneY = (start.y + end.y) / 2 <= graphHeight / 2 ? 46 : graphHeight - 46;
+  const bend = Math.min(62, Math.max(38, span / 5));
   const firstLaneX = start.x + bend;
   const lastLaneX = end.x - bend;
 
