@@ -38,7 +38,10 @@
               <span class="section-kicker">CONTACT GRAPH</span>
               <h2>Contact topology</h2>
             </div>
-            <div class="bundle-summary" id="bundleSummary"></div>
+            <div>
+              <div class="bundle-summary" id="bundleSummary"></div>
+              <div class="bundle-summary" id="contactGraphStats" aria-live="polite"></div>
+            </div>
           </div>
           <svg id="graph" viewBox="0 0 960 520" role="img" aria-label="Contact graph visualization"></svg>
           <div class="legend">
@@ -211,6 +214,7 @@
                 <button id="splitZoomOut" type="button" aria-label="縮小展開圖">縮小</button>
                 <span id="splitZoomLevel" class="split-zoom-level" aria-live="polite">100%</span>
                 <button id="splitZoomIn" type="button" aria-label="放大展開圖">放大</button>
+                <span id="nodeSplitStats" class="split-zoom-level" aria-live="polite">節點 0 · 連線 0</span>
                 <button id="splitZoomFit" type="button">適合框線</button>
               </div>
             </div>
@@ -267,7 +271,7 @@
     </div>
   </main>
 
-  <script src="app.js?v=3"></script>
-  <script src="topology.js?v=6"></script>
+  <script src="app.js?v=4"></script>
+  <script src="topology.js?v=7"></script>
 </body>
 </html>
