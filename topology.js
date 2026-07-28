@@ -15,7 +15,8 @@ const topologyUI = {
   zoomOutButton: document.getElementById("splitZoomOut"),
   zoomInButton: document.getElementById("splitZoomIn"),
   zoomFitButton: document.getElementById("splitZoomFit"),
-  zoomLevel: document.getElementById("splitZoomLevel")
+  zoomLevel: document.getElementById("splitZoomLevel"),
+  splitStats: document.getElementById("nodeSplitStats")
 };
 
 let contactState = {
@@ -126,8 +127,15 @@ function buildModel() {
 function renderAll() {
   if (!topologyUI.physicalGraph || !topologyUI.splitGraph) return;
   const nodes = getNodes();
+  const contactCount = contactState.contacts.length;
+  const splitNodeCount = nodes.length + contactCount;
+  const splitLinkCount = contactCount * 2;
   topologyUI.summary.textContent =
-    `${nodes.length} satellites · ${contactState.contacts.length} directed Contacts · synced`;
+    `節點 ${nodes.length} · 連線 ${contactCount} · synced`;
+  if (topologyUI.splitStats) {
+    topologyUI.splitStats.textContent = `節點 ${splitNodeCount} · 連線 ${splitLinkCount}`;
+    topologyUI.splitStats.title = `Ingress vertices ${contactCount} + forwarding hubs ${nodes.length}; directed Contact edges ${contactCount} + internal edges ${contactCount}`;
+  }
   renderContactSummary();
   renderMapping();
   renderPhysicalGraph();
