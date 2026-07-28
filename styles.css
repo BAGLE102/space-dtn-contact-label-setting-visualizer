@@ -458,3 +458,37 @@ th { position: sticky; top: 0; z-index: 1; background: #edf0f3; }
   .split-side { grid-template-columns: 1fr; }
   .topology-editor-panel { grid-column: auto; }
 }
+
+
+/* Node-splitting zoom controls */
+.split-graph-heading { align-items: center; }
+.split-graph-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.split-graph-tools button {
+  padding: 6px 9px;
+  font-size: 12px;
+}
+.split-zoom-level {
+  min-width: 48px;
+  padding: 6px 8px;
+  color: var(--blue);
+  background: var(--blue-pale);
+  font-family: Consolas, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+#nodeSplitGraph {
+  max-width: none;
+  transform-origin: top left;
+}
+
+@media (max-width: 760px) {
+  .split-graph-heading { align-items: flex-start; flex-direction: column; }
+  .split-graph-tools { justify-content: flex-start; }
+}
