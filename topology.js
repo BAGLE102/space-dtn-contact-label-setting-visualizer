@@ -11,7 +11,11 @@ const topologyUI = {
   splitGraph: document.getElementById("nodeSplitGraph"),
   summary: document.getElementById("physicalTopologySummary"),
   mappingTable: document.getElementById("splitMappingTable"),
-  contactSummary: document.getElementById("satelliteContactSummary")
+  contactSummary: document.getElementById("satelliteContactSummary"),
+  zoomOutButton: document.getElementById("splitZoomOut"),
+  zoomInButton: document.getElementById("splitZoomIn"),
+  zoomFitButton: document.getElementById("splitZoomFit"),
+  zoomLevel: document.getElementById("splitZoomLevel")
 };
 
 let contactState = {
@@ -20,11 +24,36 @@ let contactState = {
   highlight: { bestPath: [] }
 };
 
+const SPLIT_ZOOM = { min: 0.55, max: 1.4, step: 0.1 };
+let splitZoom = 1;
+
 topologyUI.tabs.forEach(tab => {
   tab.addEventListener("click", () => activateView(tab.dataset.viewTarget));
 });
 
+topologyUI.zoomOutButton?.addEventListener("click", () => setSplitZoom(splitZoom - SPLIT_ZOOM.step));
+topologyUI.zoomInButton?.addEventListener("click", () => setSplitZoom(splitZoom + SPLIT_ZOOM.step));
+topologyUI.zoomFitButton?.addEventListener("click", () => setSplitZoom(1));
+
 window.addEventListener("visualizer-state-change", syncFromContactModel);
+
+function setSplitZoom(nextZoom) {
+  splitZoom = Math.min(SPLIT_ZOOM.max, Math.max(SPLIT_ZOOM.min, Number(nextZoom.toFixed(2))));
+  applySplitZoom();
+}
+
+function applySplitZoom() {
+  const svg = topologyUI.splitGraph;
+  if (!svg) return;
+  const percent = Math.round(splitZoom * 100);
+  svg.style.width = `${percent}%`;
+  svg.style.minWidth = `${Math.round(760 * splitZoom)}px`;
+  svg.style.minHeight = `${Math.round(650 * splitZoom)}px`;
+
+  if (topologyUI.zoomLevel) topologyUI.zoomLevel.textContent = `${percent}%`;
+  if (topologyUI.zoomOutButton) topologyUI.zoomOutButton.disabled = splitZoom <= SPLIT_ZOOM.min;
+  if (topologyUI.zoomInButton) topologyUI.zoomInButton.disabled = splitZoom >= SPLIT_ZOOM.max;
+}
 
 function activateView(targetId) {
   topologyUI.tabs.forEach(tab => {
@@ -226,19 +255,34 @@ function renderPhysicalGraph() {
   });
 }
 
+function splitPositions(nodes, width, height) {
+  const positions = physicalPositions(nodes, width, height);
+  const source = contactState.bundle.source;
+  const destination = contactState.bundle.destination;
+
+  // A split cluster is 210px wide, so source and destination need wider
+  // side margins than the compact physical-satellite graph.
+  if (source) positions[source] = { x: 150, y: height / 2 };
+  if (destination && destination !== source) {
+    positions[destination] = { x: width - 150, y: height / 2 };
+  }
+  return positions;
+}
+
 function renderSplitGraph() {
   const svg = topologyUI.splitGraph;
   const model = buildModel();
   const nodes = getNodes();
   const width = 1200;
   const height = Math.max(720, Math.ceil(Math.max(1, nodes.length - 2) / 4) * 180 + 520);
-  const centers = physicalPositions(nodes, width, height);
+  const centers = splitPositions(nodes, width, height);
   const ports = {};
   const hubs = {};
   const best = new Set(contactState.highlight.bestPath || []);
   const grouped = groupContacts();
 
   svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  applySplitZoom();
   svg.innerHTML = markerDefinitions("split");
 
   Object.values(model).forEach(item => {
