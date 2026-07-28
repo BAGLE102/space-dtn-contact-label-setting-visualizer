@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="description" content="Interactive Space DTN Contact Graph label-setting algorithm visualizer." />
   <title>Space DTN Contact Label-setting Visualizer</title>
-  <link rel="stylesheet" href="styles.css?v=4" />
+  <link rel="stylesheet" href="styles.css?v=5" />
 </head>
 <body>
   <main class="page">
@@ -202,12 +202,17 @@
           </section>
 
           <section class="graph-card node-split-card">
-            <div class="section-title">
+            <div class="section-title split-graph-heading">
               <div>
                 <span class="section-kicker">NODE-SPLITTING GRAPH</span>
                 <h2>展開後的有向拓樸</h2>
               </div>
-              <div class="bundle-summary">incoming Contact → ingress → forwarding hub → next Contact</div>
+              <div class="split-graph-tools" aria-label="展開圖縮放控制">
+                <button id="splitZoomOut" type="button" aria-label="縮小展開圖">縮小</button>
+                <span id="splitZoomLevel" class="split-zoom-level" aria-live="polite">100%</span>
+                <button id="splitZoomIn" type="button" aria-label="放大展開圖">放大</button>
+                <button id="splitZoomFit" type="button">適合框線</button>
+              </div>
             </div>
             <div class="split-graph-scroll">
               <svg id="nodeSplitGraph" viewBox="0 0 1200 760" role="img" aria-label="Node-splitting expanded satellite topology"></svg>
@@ -263,6 +268,6 @@
   </main>
 
   <script src="app.js?v=3"></script>
-  <script src="topology.js?v=5"></script>
+  <script src="topology.js?v=6"></script>
 </body>
 </html>
